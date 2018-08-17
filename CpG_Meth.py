@@ -1,9 +1,9 @@
 #!/usr/bin/python
 #-*- coding:utf-8 -*-
 ################################################
-#File Name: methCalc.py
-#Author: Mischa Lundberg
-#Mail: mischa.lundberg@mater.uq.edu.au
+#File Name: methCalc.py                        #
+#Author: Mischa Lundberg                       #
+#Mail: mischa.lundberg@mater.uq.edu.au         #
 ################################################
 
 
@@ -16,8 +16,6 @@ import matplotlib
 matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 import pysam
-from collections import defaultdict
-from Bio.Seq import Seq
 from Bio import SeqIO
 
 
@@ -26,6 +24,10 @@ def main(args):
 
     cite = ['Please dont foget to cite: \nhttps://github.com/MischaLundberg/CpG_methylation_pipeline\n','Samtools: https://www.ncbi.nlm.nih.gov/pubmed/19505943','BWAMeth: http://bio-bwa.sourceforge.net/']
     sam = bwameth = 0
+    global start
+    global end
+    start = -1
+    end = -1
     
     outputFile = args.o
     if outputFile == None:
@@ -33,6 +35,10 @@ def main(args):
 
     exceloutput = outputFile+".xlsx"
     csvoutput = outputFile+".csv"
+    if args.region != '':
+        regionStart = int(args.region.split(":")[1].split("-")[0])
+    else:
+        regionStart = 0
 
     #################################################################
     #   Try to automatically decide where to start in the pipeline  #
@@ -45,7 +51,9 @@ def main(args):
         ## if you didnt supply the needed reference fasta
         if ".fasta" not in args.r and ".fa" not in args.r:
             ## TODO: add system.stderr message
-            print "Please supply Fasta file (reference Genome)"
+            print "!"*47
+            print "! Please supply Fasta file (reference Genome) !"
+            print "!"*47
 
         ## if you are using a preexisting .bam file to run you methylation analysis on in
         else:
@@ -55,13 +63,13 @@ def main(args):
             writer = pd.ExcelWriter(exceloutput)
             CpGs.to_excel(writer,'CpG')
             writer.save()
-            print "excelsheet saved here: "+exceloutput
+            print "*** Excelsheet saved here: %s" %exceloutput
             CpGs.to_csv(csvoutput, sep=',',header=False,index=False) 
-            plot(csvoutput, outputFile+".svg")
+            plot(csvoutput, outputFile+".svg", regionStart, not(args.portrait))
 
     ## if you use a output file from a prevalent step
     elif ".txt" in args.i or ".csv" in args.i:
-        plot(args.i, outputFile+".svg")
+        plot(args.i, outputFile+".svg", regionStart, not(args.portrait))
 
     ## if you want to run the full pipeline
     elif ".fa" in args.r and "," in args.i:
@@ -72,12 +80,14 @@ def main(args):
         writer = pd.ExcelWriter(exceloutput)
         CpGs.to_excel(writer,'CpG')
         writer.save()
-        print "excelsheet saved here: "+exceloutput
+        print "*** Excelsheet saved here: %s" %exceloutput
         CpGs.to_csv(file_name=csvoutput, sep=',',header=False,index=False)
-        
+        plot(csvoutput, outputFile+".svg", regionStart, not(args.portrait))
 
     elif ".bed" in args.r and ".bed" in args.i:
-        print "Run it from bed is not implemented so far."
+        print "!"*48
+        print "! Run it from a bed is not implemented so far. !"
+        print "!"*48
         #TODO: add system.stderr message
         
     citation = cite[0]
@@ -92,12 +102,12 @@ def main(args):
 def methyl(args):
     
 
-    meth_dict = {'Methylation_List','Family','UUID'}
+    meth_dict = {'Methylation_List','Family','UUID','position'}
     CG_dict = {'Chr','Start','Stop'}
     samfile = pysam.AlignmentFile(args.bam, "rb")
     ref = SeqIO.to_dict(SeqIO.parse(open(args.r), 'fasta'))
     faChrCheck =  "chr" in SeqIO.parse(open(args.r), 'fasta').next().id 
-    header = ["chr","start","stop","UUID","methylated"]
+    header = ["chr","start","stop","UUID","methylated","position"]
     CpG = pd.DataFrame(columns=header)
     if ":" in args.region and "-" in args.region:
         chrom = args.region.split(":")[0]
@@ -107,65 +117,87 @@ def methyl(args):
             chrom = args.region.split(":")[0][3:]
     else:
         #TODO: add system.stderr message
-        print "the given region is not given in the needed way chr:start-stop"
+        print "the region is not given in the needed way chr:start-stop"
 
-
-#    CpG = initializeCpG(CpG,ref.get(chrom)[start:end],chrom,start,end)
+    ## fill the dataframe with all CpGs from the reference to then check the methylation status of each read for each CpG
+    referenceCpGs = initializeCpG(CpG,ref.get(chrom)[start:end],chrom,start,end)
 
     if args.region == "":
         for read in samfile.fetch():
-            CpG = updateCpG(read, CpG, faChrCheck)
+            CpG = updateCpG(read, CpG, faChrCheck, referenceCpGs, start)
 
     else:
         for read in samfile.fetch(args.region.split(":")[0],int(args.region.split(":")[1].split("-")[0]),int(args.region.split("-")[1])):
-            CpG = updateCpG(read, CpG, faChrCheck)
+            CpG = updateCpG(read, CpG, faChrCheck, referenceCpGs, start)
 
-
+    CpG = equalizeCpG(CpG)
     return CpG.dropna(thresh=4)
 
-##  Initializes the CpG DataFrame with all positions of a CG
+##  Initializes the CpG Dict with all positions of a CG
 ##  to later on check these positions for their methylation 
 ##  in the BAM file
 def initializeCpG(CpG, referenceSeq, chrom, start, end):
 
 
-    data = []
+    CpGs = []
     for element in range(len(referenceSeq)-1):
         if referenceSeq[element] == "C" and referenceSeq[element+1] == "G":
-            data.append({"chr":chrom,"start":start+element,"stop":start+element+1,"UUID":np.nan,"methylated":-1})
-    CpGs = CpG.append(data, ignore_index=True)
+            CpGs.append({"chr":chrom,"start":start+element,"stop":start+element+1,"UUID":np.nan,"methylated":-1,"position":start+element})
     
     return CpGs
 
-##  Appends the given CpG DataFrame with each CG position
-##  in the 
-def updateCpG(read, CpG, faChr):
+##  Updates the given CpG DataFrame for each CG position
+##  in the reference file
+def updateCpG(read, CpG, faChr, referenceCpGs, regionStart):
 
-    
+    global start
+    global end
     data = []
-    for element in range(len(read.seq)-1):
-        methylated = 0
-        if read.seq[element] == "C" and read.seq[element+1] == "G":
-            methylated = 1 
-        elif read.is_reverse and read.seq[element] == "G" and read.seq[element+1] == "C":
-            methylated = 1
-        elif read.seq[element] == "T" and read.seq[element+1] == "G":
-            methylated = 1
-        chrom = read.reference_name
-        if not faChr:
-            if len(chrom) <= 2:
-                chrom = "chr"+read.reference_name
-#        print CpG['UUID'][CpG['chr'] == chrom][CpG['start'] == read.pos].values
-#        print CpG.loc[(CpG['chr'] == chrom) & (CpG['start'] == read.pos)]
-        if CpG['UUID'][CpG['chr'] == chrom][CpG['start'] == read.pos].values == []:
-            row = CpG.iloc[['chr' == read.reference_name]['start' == read.pos]]
-            CpG.at[row,'UUID'] = read.query_name
-            CpG.at[row,'methylated'] = methylated
-        else:
-            data.append({"chr":chrom,"start":read.pos,"stop":read.pos+1,"UUID":read.query_name,"methylated":methylated})
-
+    ###iterate over all Cs in the referenceCpGs
+    position = read.reference_start - regionStart
+    for entry in referenceCpGs:#element in range(len(read.seq)-1):
+        #### each entry represents one C within the reference
+        element = int(entry.get("position"))-regionStart
+        methylated = -1
+        if (entry.get("position")>=read.reference_start) and (entry.get("position")<=read.reference_end):
+            if start == -1:
+                start = position
+            if end < position:
+                end = position
+            element = int(entry.get("position")-read.reference_start)
+            if read.seq[element] == "C":
+                methylated = 1 
+            elif read.seq[element] == "T":
+                methylated = 0#2
+            elif read.seq[element] == "N": 
+                methylated = 2#3
+            else:
+                methylated = 3
+            chrom = read.reference_name
+            if not faChr:
+                if len(chrom) <= 2:
+                    chrom = "chr"+read.reference_name
+            if CpG['UUID'][CpG['chr'] == chrom][CpG['start'] == read.pos].values == []:
+                row = CpG.iloc[['chr' == read.reference_name]['start' == read.pos]]
+                CpG.at[row,'UUID'] = read.query_name
+                CpG.at[row,'methylated'] = methylated
+                CpG.at[row,'position'] = position-start
+            else:
+                data.append({"chr":chrom,"start":read.reference_start,"stop":read.reference_end,"UUID":read.query_name,"methylated":methylated,"position":position-start})
+        position += 1
+        
     tmp = CpG.append(data, ignore_index=True)
     return tmp
+
+    
+def equalizeCpG(CpG):
+    
+    minPos = CpG['position'].min()
+    maxPos = CpG['position'].max()
+    for index, item in CpG.iterrows():
+        CpG.loc[index]['position'] -= minPos
+
+    return CpG
 
 ## needs reference (.fa) and fastq as input
 ### reference has to be indexed by bwameth...
@@ -185,7 +217,7 @@ def make_meth(args):
     ##check if reference is indexed
     if not os.path.isfile(args.r+".bwameth.c2t"):
         command = "bwameth.py index "+args.r
-    
+    print "*** Indexing your reference fasta %s" %args.r
     command = ""
 
     if ".fa" in args.r and len(args.i.split(",")) == 2 : 
@@ -298,52 +330,77 @@ def get_ref_for_pos(ref, pos, inputformat):
 
 
 
-def plot(plotData, outputFile):
+def plot(plotData, outputFile, regionStart, landscape):
 
-    a = open(plotData, 'r')
-    data = a.readlines()
-    a.close()
-    tmp = []
-    for ent in data:
-        tmp.append(ent.split("\n")[0].split("\r")[0].split(","))
-    data = tmp
-    # Create the general block and the "subplots" i.e. the bars
-    f, ax1 = plt.subplots(1, figsize=(len(data[0]),len(data)))
-    # Set the bar width
-    bar_width = 0.75
-    x = 0
-    y = len(data)
-    c = 0
-    circles = []
-    rows = len(data)
-    ax1.set_xlim((0,len(data[0])))
-    ax1.set_ylim((0,y))
-    plt.xticks([])
-    plt.yticks([])
-    offset = 0.5
-    for row in data:
-        x = 0 
-        for col in row:
-            print "row: "+str(row)+", col: "+col+", x: "+str(x)+", y: "+str(y)
-            pos = rows - c
-            if col == "0":
-                circle = plt.Circle((x+offset, y-offset), offset, color='black', fill=False) #color=colors[c], fill=False)
-
-            else:
-                circle = plt.Circle((x+offset, y-offset), offset, color='black', fill=True) #colors[c], fill=True)
-
-            circles.append(circle)
-            c += 1
-            x += 1
-
-        y -= 1
     
-    for ent in circles:
-        ax1.add_artist(ent)
+    df = pd.read_csv(plotData, sep=',', names = ["chr","start","stop","UUID","methylated","position"])
+    read_grouped = df.groupby('UUID')
+    start_grouped = df.groupby('position')
+    reads = read_grouped.groups.keys()
+    if len(df.index) > 0:
 
-    plt.savefig(outputFile, dpi=1000)
-    print "Output is saved under: %s" %outputFile
+        if landscape:
+            f, ax1 = plt.subplots(figsize=(len(start_grouped),len(read_grouped)))
+        else:
+            f, ax1 = plt.subplots(figsize=(len(read_grouped),len(start_grouped)))
+        bar_width = 0.75
+        circles = []
+        if landscape:
+            ax1.set_xlim((0,len(start_grouped)))
+            ax1.set_ylim((0,len(read_grouped)))
+        else:
+            ax1.set_xlim((0,len(read_grouped)-1))
+            ax1.set_ylim((0,len(start_grouped)))
+        plt.xticks([])
+        plt.yticks([])
+        offset = 0.492
+        emptyCircle = []
+        circles = []
+        
+        if landscape:
+            x = 0
+        else:
+            y = len(start_grouped)
 
+        for position, group in start_grouped:
+
+            if landscape:
+                y = 1
+            else:
+                x = 0
+            
+            for read in reads:
+                circle = plt.Circle((x+offset, y-offset), offset, color='white', linestyle='None', fill=False)
+                if group['UUID'].str.contains(read).any():
+                    
+                    ind = group[group['UUID']==read].index.values.astype(int)[0]
+                    methylated = int(group.loc[ind]['methylated'])
+                    if methylated == 0: ##not methylated
+                        circle = plt.Circle((x+offset, y-offset), offset, color='black', fill=False)
+                    elif methylated == 1: ##methylated
+                        circle = plt.Circle((x+offset, y-offset), offset, color='black', fill=True)
+                    elif methylated == 2: ##detected an N
+                        circle = plt.Circle((x+offset, y-offset), offset, color='grey', fill=True)
+                    elif methylated == 3: ##something other than C, T or N
+                        circle = plt.Circle((x+offset, y-offset), offset, color='grey', fill=False, linestyle='--', hatch='+')
+                ax1.add_artist(circle)
+                if landscape:
+                    y += 1
+                else:
+                    x += 1    
+            if landscape:
+                x += 1
+            else:
+                y -= 1
+        plt.savefig(outputFile, dpi=300)
+        print "Output is saved under: %s" %outputFile
+        
+    
+    else:
+        #TODO: add stderr Message
+        print "#"*80
+        print "# no Data to plot. Please check the region of interest for CpGs in the Excel sheet."
+        print "#"*80
 
 
 if __name__ == '__main__':
@@ -356,6 +413,7 @@ if __name__ == '__main__':
     parser.add_argument('-f', required=False, default=6000, help='for filtering the insertions. e.g. 6000 --> minimum 6kb length. ONLY APPLIES WHEN ALIGNING A NEW .BAM FILE!')
     parser.add_argument('--bam', required=False, help='location of .bam file can be set either here or in args.i')
     parser.add_argument('--region', default="", required=False, help='should be e.g. "chr1:10000-20000"')
+    parser.add_argument('--portrait', default=False, required=False, action='store_true', help='create figure in portrait mode instead of landscape, default=False')
 #    parser.add_argument('--lookup', required=False, help='needed if -r is a fasta file and you want to create a graph and bedgraph file. e.g. L1HS.bed')
 
     args = parser.parse_args()

@@ -14,15 +14,24 @@ Full run:
 - Reference FASTA (for the alignment)
 - Region to calculate the methylation
 - (optional) outputfilename
-- (optional) filter the length of insertions (default is 6000)
+- [not implemented yet](optional) filter the length of insertions (default is 6000)
 .....
 
-# Outlook
+# Prerequisites
+If not stated otherwise Install the newest version.
+Python 2.7 (if running anaconda, everything except pysam and biopython is already preinstalled)
+- pandas (install with pip install pandas)
+- numpy (install with pip install pnumpy)
+- matplotlib (install with pip install matplotlib)
+- pysam (install with pip install pysam)
+- Biopython (install with pip instal biopython)
+
+# Further development
 There is going to be a future update containing the options
 - to derive only sequences for a given BED file
 - generating a Excel sheet showing the overall methylation of each sequence/insertion (if used for analyzing e.g. SVA/ALU/L1/LTR.... sequences)
 
 # Contact
-For Questions or errors, either create a issue/pullrequest or contact me via email (mischa(dot)lundberg(at)mater(dot)uq(dot)edu(dot)au
+For questions or errors, either create a issue/pullrequest or contact me via email (mischa(dot)lundberg(at)mater(dot)uq(dot)edu(dot)au
 
 # Dont forget to cite
