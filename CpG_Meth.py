@@ -26,14 +26,20 @@ def main(args):
     sam = bwameth = 0
     global start
     global end
+    global global_read_c
+    global global_ref_c
+    global nr_of_reads
     start = -1
     end = -1
+    global_read_c = 0
+    global_ref_c = 0
+    nr_of_reads = 0.0
     
     outputFile = args.o
     if outputFile == None:
         outputFile = os.path.splitext(args.i)[0]
 
-    exceloutput = outputFile+".xlsx"
+    exceloutput = outputFile
     csvoutput = outputFile+".csv"
     if args.region != '':
         regionStart = int(args.region.split(":")[1].split("-")[0])
@@ -60,10 +66,21 @@ def main(args):
             if args.bam == None:
                 args.bam = args.i
             CpGs = methyl(args)
-            writer = pd.ExcelWriter(exceloutput)
+            CpG_methylation = CpGs[CpGs['chr'].str.endswith("read_c_count")]## get all lines with "read_c_count"
+            CpG_methylation.reset_index()
+            for index, row in CpG_methylation.iterrows():
+                CpG_methylation.loc[index, 'chr'] = str(CpG_methylation.loc[index]['chr'].split('|')[0])
+            CpG_methylation.columns = ['chr','start','stop','UUID','[methylated C\'s, C\'s in reference]', 'methylation of this read']
+            last_line = pd.DataFrame([['methylation','over','all','reads','together:',(((global_read_c/nr_of_reads)/global_ref_c)*100)]], columns=CpG_methylation.columns)
+            CpG_methylation = CpG_methylation.append(last_line, ignore_index=True)
+            CpGs = CpGs[~CpGs['chr'].str.endswith("read_c_count")]## get all lines but lines with "read_c_count"
+            writer = pd.ExcelWriter(exceloutput+".xlsx")
             CpGs.to_excel(writer,'CpG')
             writer.save()
-            print "*** Excelsheet saved here: %s" %exceloutput
+            writer = pd.ExcelWriter(exceloutput+"_methylation_per_read.xlsx")
+            CpG_methylation.to_excel(writer,'CpG methylation')
+            writer.save()
+            print "*** Excelsheet saved here: %s" %exceloutput+".xlsx"
             CpGs.to_csv(csvoutput, sep=',',header=False,index=False) 
             plot(csvoutput, outputFile+".svg", regionStart, not(args.portrait))
 
@@ -77,10 +94,21 @@ def main(args):
         sam = 1
         bwameth = 1
         CpGs = methyl(args)
-        writer = pd.ExcelWriter(exceloutput)
+        CpG_methylation = CpGs[CpGs['chr'].str.endswith("read_c_count")]## get all lines with "read_c_count"
+        for index, row in CpG_methylation.iterrows():
+            CpG_methylation.loc[index, 'chr'] = str(CpG_methylation.loc[index]['chr'].split('|')[0])
+        CpG_methylation.columns = ['chr','start','stop','UUID','[methylated C\'s, C\'s in reference]', 'methylation of this read']
+        last_line = pd.DataFrame([['methylation','over','all','reads','together:',(((global_read_c/nr_of_reads)/global_ref_c)*100)]], columns=CpG_methylation.columns)
+        CpG_methylation = CpG_methylation.append(last_line, ignore_index=True)
+        CpG_methylation.reset_index()
+        CpGs = CpGs[~CpGs['chr'].str.endswith("read_c_count")]## get all lines but lines with "read_c_count"
+        writer = pd.ExcelWriter(exceloutput+".xlsx")
         CpGs.to_excel(writer,'CpG')
         writer.save()
-        print "*** Excelsheet saved here: %s" %exceloutput
+        writer = pd.ExcelWriter(exceloutput+"_methylation.xlsx")
+        CpG_methylation.to_excel(writer,'CpG methylation')
+        writer.save()
+        print "*** Excelsheet saved here: %s" %exceloutput+".xlsx"
         CpGs.to_csv(file_name=csvoutput, sep=',',header=False,index=False)
         plot(csvoutput, outputFile+".svg", regionStart, not(args.portrait))
 
@@ -97,11 +125,14 @@ def main(args):
         citation += cite[2]
     print citation
         
+        
 ##  Creates a Pandas DataFrame containing the parsed
 ##  input BAM file
 def methyl(args):
     
 
+    global global_ref_c
+    global nr_of_reads
     meth_dict = {'Methylation_List','Family','UUID','position'}
     CG_dict = {'Chr','Start','Stop'}
     samfile = pysam.AlignmentFile(args.bam, "rb")
@@ -122,12 +153,15 @@ def methyl(args):
     ## fill the dataframe with all CpGs from the reference to then check the methylation status of each read for each CpG
     referenceCpGs = initializeCpG(CpG,ref.get(chrom)[start:end],chrom,start,end)
 
+    global_ref_c = len(referenceCpGs)
     if args.region == "":
         for read in samfile.fetch():
+            nr_of_reads += 1
             CpG = updateCpG(read, CpG, faChrCheck, referenceCpGs, start)
 
     else:
         for read in samfile.fetch(args.region.split(":")[0],int(args.region.split(":")[1].split("-")[0]),int(args.region.split("-")[1])):
+            nr_of_reads += 1
             CpG = updateCpG(read, CpG, faChrCheck, referenceCpGs, start)
 
     CpG = equalizeCpG(CpG)
@@ -153,6 +187,10 @@ def updateCpG(read, CpG, faChr, referenceCpGs, regionStart):
     global start
     global end
     data = []
+    current_read_c = 0.0
+    current_ref_c = 0.0
+    global global_read_c
+
     ###iterate over all Cs in the referenceCpGs
     position = read.reference_start - regionStart
     for entry in referenceCpGs:#element in range(len(read.seq)-1):
@@ -160,6 +198,7 @@ def updateCpG(read, CpG, faChr, referenceCpGs, regionStart):
         element = int(entry.get("position"))-regionStart
         methylated = -1
         if (entry.get("position")>=read.reference_start) and (entry.get("position")<=read.reference_end):
+            current_ref_c += 1
             if start == -1:
                 start = position
             if end < position:
@@ -167,6 +206,8 @@ def updateCpG(read, CpG, faChr, referenceCpGs, regionStart):
             element = int(entry.get("position")-read.reference_start)
             if read.seq[element] == "C":
                 methylated = 1 
+                global_read_c += 1
+                current_read_c += 1
             elif read.seq[element] == "T":
                 methylated = 0#2
             elif read.seq[element] == "N": 
@@ -185,9 +226,10 @@ def updateCpG(read, CpG, faChr, referenceCpGs, regionStart):
             else:
                 data.append({"chr":chrom,"start":read.reference_start,"stop":read.reference_end,"UUID":read.query_name,"methylated":methylated,"position":position-start})
         position += 1
-        
-    tmp = CpG.append(data, ignore_index=True)
-    return tmp
+    ##append data with the current methylation rate of the read
+    data.append({"chr":str(chrom)+"|read_c_count","start":read.reference_start,"stop":read.reference_end,"UUID":read.query_name,"methylated":[current_read_c,current_ref_c],"position":((current_read_c/current_ref_c)*100)})
+    out = CpG.append(data, ignore_index=True)
+    return out
 
     
 def equalizeCpG(CpG):
@@ -195,8 +237,9 @@ def equalizeCpG(CpG):
     minPos = CpG['position'].min()
     maxPos = CpG['position'].max()
     for index, item in CpG.iterrows():
-        CpG.loc[index]['position'] -= minPos
-
+        if "read_c_count" not in CpG.loc[index]['chr']:
+            CpG.loc[index, 'position'] -= minPos
+        
     return CpG
 
 ## needs reference (.fa) and fastq as input
@@ -234,75 +277,7 @@ def make_meth(args):
  
     return outputSorted
 
-
-def build_dict(args):
-
-
-    a = open(args.i, 'r')
-    bed = a.readlines()
-    a.close()
-    a = open(args.r, 'r')
-    ref = a.readlines()
-    a.close()
-
-    inputformat = 0
-
-    if int(len(ref[0].split('\n')[0].split('\t'))) == 17:
-        if ref[0].split('\n')[0][:3] != "bin":
-            refpd = pd.read_csv(args.r, sep='\t', header=None, names=["bin","swScore","milliDiv","milliDel","milliIns","genoName","genoStart","genoEnd","genoLeft",\
-            "strand","repName","repClass","repFamily","repStart","repEnd","repLeft","id"])
-        else:
-            refpd = pd.read_csv(args.r, sep='\t', header=0)
-
-    elif args.r[-3:] == "bed":
-        refpd = pd.read_csv(args.r, sep='\t', header=None, index_col=False, names=["genoName","genoStart","genoEnd","repName","swScore","strand"])#,"bin"])
-        inputformat = 1
-    else:
-        print "please use either bed format or the native repeatmasker format."
-        exit(0)
-
-    outdict = pd.DataFrame(columns=['ID','Name','Chrom','Start','End','Methylation','Count','Primer_pos','Length_of_finding'])
-
-    for lines in bed:
-        if lines[:1] != "t":
-            refLine = get_ref_for_pos(refpd, lines.split('\n')[0].split('\t'), inputformat)
-            if not refLine.empty:
-                ID = refLine.iloc[0]['repName']+";"+str(refLine.iloc[0]['genoName'])+":"+str(refLine.iloc[0]['genoStart'])+"="+str(refLine.iloc[0]['genoEnd'])+"="+str(refLine.iloc[0]['strand'])
-                outdict = outdict.append({'ID':ID,'Name':refLine.iloc[0]['repName'],'Chrom':str(refLine.iloc[0]['genoName']),'Start':int(refLine.iloc[0]['genoStart']),\
-                'End':int(refLine.iloc[0]['genoEnd']),'Methylation':int(lines.split('\n')[0].split('\t')[3]),'Count':1,\
-                'Length_of_finding':(int(lines.split('\n')[0].split('\t')[2])-int(lines.split('\n')[0].split('\t')[1]))}, ignore_index=True)
-
-    tmp = pd.DataFrame(columns=['ID','Methylation'])
-    count = outdict.groupby('ID')[['Count']].sum()
-    meth = outdict.groupby('ID')[['Methylation']].sum()
-    meth2 = outdict.groupby('ID').agg({'Count':'sum','Methylation':'sum'})
-    tmp = meth2.apply(lambda row: row['Methylation']/row['Count'], axis=1)
-    tmp = tmp.to_frame()
-    tmp.rename(columns={0:'Methylation'}, inplace=True)
-    tmp = tmp.apply(lambda row: add_bed(row), axis=1)
-    tmp = tmp.sort_values(by=['Chromosome','Methylation'], ascending=[True, False])
-
-    if "xlsx" in args.o:
-        writer = pd.ExcelWriter(args.o, engine='xlsxwriter')
-        tmp.to_excel(writer, sheet_name='Methylation')
-        writer.save()
-    elif ".bedGraph" in args.o or ".bedgraph" in args.o:
-        header = "#\tinput bedGraph: "+args.i+"\n#\tinput reference: "+args.r+"\n#\tChromosome\tStart\tEnd\tMethylation\t"
-        header += "\ntrack type=bedGraph name=\"methCalc_to_bedGraph\" description=\"Methylation for all overlapping inputs with referece for the input %s\" visibility=full color=200,100,0 altColor=0,100,200 priority=20" %(args.i)
-        body = ""
-        for index, row in tmp.iterrows():
-            body += "\n"+row['Chromosome']+"\t"+row['Start']+"\t"+row['End']+"\t"+str(row['Methylation'])+"\t"+index+"\t"+str(row['Strand'])
-        a = open(args.o, 'w')
-        a.write(header)
-        a.write(body)
-        a.close()
-    else:
-        #TODO: add system.stderr message
-        print ""
-
-    return tmp
-
-
+    
 def add_bed(row):
 
 
@@ -332,6 +307,7 @@ def get_ref_for_pos(ref, pos, inputformat):
 
 def plot(plotData, outputFile, regionStart, landscape):
 
+    
     
     df = pd.read_csv(plotData, sep=',', names = ["chr","start","stop","UUID","methylated","position"])
     read_grouped = df.groupby('UUID')
