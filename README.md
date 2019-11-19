@@ -7,6 +7,24 @@ The different steps of the pipeline are
 - Analyzing the CpG methylation for each read
 - Writing data to an Excel sheet containing chromosom, start, stop, UUID, methylated (yes/no)
 
+
+# Getting Started
+In order to download `TEpoly`, you should clone this repository via the commands
+```  
+git clone https://github.com/MischaLundberg/CpG_methylation_pipeline
+cd CpG-methylation_pipeline
+```
+
+In order to install the Python dependencies, you will need the [Anaconda](https://store.continuum.io/cshop/anaconda/) Python distribution and package manager. After installing Anaconda, run the following commands to create an environment with CpG_Meth's dependencies:
+
+```
+conda env create --file environment.yml
+source activate cpgmeth
+```
+
+If you receive any errors while running CpG_Meth, please ensure your versioning for the prerequisites is according to the tested versions.
+
+
 # Input
 The needed input depends on the stage you want to run with the pipeline.
 Full run:
@@ -17,14 +35,58 @@ Full run:
 - [not implemented yet](optional) filter the length of insertions (default is 6000)
 .....
 
+usage: CpG_Meth.py [-h] -i I [-r R] [-o O] [-f F] [--N_color N_COLOR]
+                   [--other_color OTHER_COLOR] [--bam BAM] [--region REGION]
+                   [--portrait] [--strict_cpg]
+
+Determines the Methylation of given position relative to a reference. You can
+start a run like: /DIRECTORY/methCalc.py -i /FILE_DIRECTORY/simplebs_480.sorted_CpG.bedGraph -r /FILE_DIRECTORY/L1HS.rmsk.txt -o /FILE_DIRECTORY/simplebs_480.bedGraph
+
+If you want to start your run with FASTQ files, your arguments should be set as following:
+/DIRECTORY/methCalc.py -i /FILE_DIRECTORY/simplebs_480.1.fastq,/FILE_DIRECTORY/simplebs_480.2.fastq -r /FILE_DIRECTORY/L1HS.rmsk.txt -o /FILE_DIRECTORY/simplebs_480.bedGraph
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -i I                  input might be [.bam file, Bedgraph ,comma separated
+                        list of fastq, .txt file (with 0 and 1)]
+  -r R                  input referece file, depending on input file, might be
+                        bed/fasta/empty e.g. L1HS.bed
+  -o O                  output file, e.g. ./meth.xlsx (output file is in Excel
+                        format).
+  -f F                  for filtering the insertions. e.g. 6000 --> minimum
+                        6kb length. ONLY APPLIES WHEN ALIGNING A NEW .BAM
+                        FILE!
+  --N_color N_COLOR     select the color you want to use for illustrating if
+                        the read has at the current position a N,
+                        default='green'
+  --other_color OTHER_COLOR
+                        select the color you want to use for illustrating if
+                        the read has at the current position something else
+                        than CG, TG or N, default='grey'
+  --bam BAM             location of .bam file can be set either here or in
+                        args.i
+  --region REGION       should be e.g. "chr1:10000-20000"
+  --portrait            create figure in portrait mode instead of landscape,
+                        default=False
+  --strict_cpg          Strict CpG site check of bisulfite sequence for
+                        repetitive sequence analysis
+
+
 # Prerequisites
 If not stated otherwise Install the newest version.
 Python 2.7 (if running anaconda, everything except pysam and biopython is already preinstalled)
-- pandas (install with pip install pandas)
-- numpy (install with pip install pnumpy)
-- matplotlib (install with pip install matplotlib)
-- pysam (install with pip install pysam)
+- Pandas (install with pip install pandas)
+- Numpy (install with pip install pnumpy)
+- Matplotlib (install with pip install matplotlib)
+- Pysam (install with pip install pysam)
 - Biopython (install with pip instal biopython)
+
+- Script was tested with the following versions installed:
+ - Anaconda2
+ - Pandas: 0.22.0
+ - Numpy: 1.14.3
+ - Pysam: 0.14.1
+ - Biopython: 1.71
 
 # Further development
 There is going to be a future update containing the options

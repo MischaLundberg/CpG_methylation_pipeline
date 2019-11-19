@@ -1,7 +1,8 @@
 #!/usr/bin/python
 #-*- coding:utf-8 -*-
 ################################################
-#File Name: methCalc.py                        #
+#File Name:CpG_Meth.py                         #
+#Python version: 2.7                           #
 #Author: Mischa Lundberg                       #
 #Mail: mischa.lundberg@mater.uq.edu.au         #
 ################################################
@@ -82,11 +83,11 @@ def main(args):
             writer.save()
             print "*** Excelsheet saved here: %s" %exceloutput+".xlsx"
             CpGs.to_csv(csvoutput, sep=',',header=False,index=False) 
-            plot(csvoutput, outputFile+".svg", regionStart, not(args.portrait))
+            plot(csvoutput, outputFile+".svg", regionStart, not(args.portrait), args.N_color, args.other_color)
 
     ## if you use a output file from a prevalent step
     elif ".txt" in args.i or ".csv" in args.i:
-        plot(args.i, outputFile+".svg", regionStart, not(args.portrait))
+        plot(args.i, outputFile+".svg", regionStart, not(args.portrait), args.N_color, args.other_color)
 
     ## if you want to run the full pipeline
     elif ".fa" in args.r and "," in args.i:
@@ -110,7 +111,7 @@ def main(args):
         writer.save()
         print "*** Excelsheet saved here: %s" %exceloutput+".xlsx"
         CpGs.to_csv(file_name=csvoutput, sep=',',header=False,index=False)
-        plot(csvoutput, outputFile+".svg", regionStart, not(args.portrait))
+        plot(csvoutput, outputFile+".svg", regionStart, not(args.portrait), args.N_color, args.other_color)
 
     elif ".bed" in args.r and ".bed" in args.i:
         print "!"*48
@@ -157,12 +158,12 @@ def methyl(args):
     if args.region == "":
         for read in samfile.fetch():
             nr_of_reads += 1
-            CpG = updateCpG(read, CpG, faChrCheck, referenceCpGs, start)
+            CpG = updateCpG(read, CpG, faChrCheck, referenceCpGs, start, args.strict_cpg)
 
     else:
         for read in samfile.fetch(args.region.split(":")[0],int(args.region.split(":")[1].split("-")[0]),int(args.region.split("-")[1])):
             nr_of_reads += 1
-            CpG = updateCpG(read, CpG, faChrCheck, referenceCpGs, start)
+            CpG = updateCpG(read, CpG, faChrCheck, referenceCpGs, start, args.strict_cpg)
 
     CpG = equalizeCpG(CpG)
     return CpG.dropna(thresh=4)
@@ -176,13 +177,14 @@ def initializeCpG(CpG, referenceSeq, chrom, start, end):
     CpGs = []
     for element in range(len(referenceSeq)-1):
         if referenceSeq[element] == "C" and referenceSeq[element+1] == "G":
-            CpGs.append({"chr":chrom,"start":start+element,"stop":start+element+1,"UUID":np.nan,"methylated":-1,"position":start+element})
+            CpGs.append({"chr":chrom,"start":start+element,"stop":start+element+1,"UUID":np.nan,\
+                        "methylated":-1,"position":start+element})
     
     return CpGs
 
 ##  Updates the given CpG DataFrame for each CG position
 ##  in the reference file
-def updateCpG(read, CpG, faChr, referenceCpGs, regionStart):
+def updateCpG(read, CpG, faChr, referenceCpGs, regionStart, strict_cpg):
 
     global start
     global end
@@ -191,7 +193,7 @@ def updateCpG(read, CpG, faChr, referenceCpGs, regionStart):
     current_ref_c = 0.0
     global global_read_c
 
-    ###iterate over all Cs in the referenceCpGs
+    ### iterate over all Cs in the referenceCpGs
     position = read.reference_start - regionStart
     for entry in referenceCpGs:#element in range(len(read.seq)-1):
         #### each entry represents one C within the reference
@@ -204,16 +206,32 @@ def updateCpG(read, CpG, faChr, referenceCpGs, regionStart):
             if end < position:
                 end = position
             element = int(entry.get("position")-read.reference_start)
-            if read.seq[element] == "C":
-                methylated = 1 
-                global_read_c += 1
-                current_read_c += 1
-            elif read.seq[element] == "T":
-                methylated = 0#2
-            elif read.seq[element] == "N": 
-                methylated = 2#3
+            if not read.is_reverse:
+                # methylated
+                if (strict_cpg and read.seq[element] == "C" and read.seq[element+1] == "G") or (not strict_cpg and read.seq[element] == "C"):
+                    methylated = 1 
+                    global_read_c += 1
+                    current_read_c += 1
+                # not methylated
+                elif (strict_cpg and read.seq[element] == "T" and read.seq[element+1] == "G") or (not strict_cpg and read.seq[element] == "T"):
+                    methylated = 0 
+                elif read.seq[element] == "N": 
+                    methylated = 2#3
+                else:
+                    methylated = 3
             else:
-                methylated = 3
+                # methylated
+                if (strict_cpg and read.seq[element+1] == "C" and read.seq[element] == "G") or (not strict_cpg and read.seq[element+1] == "C"):
+                    methylated = 1 
+                    global_read_c += 1
+                    current_read_c += 1
+                # not methylated
+                elif (strict_cpg and read.seq[element+1] == "T" and read.seq[element] == "G") or (not strict_cpg and read.seq[element+1] == "T"):
+                    methylated = 0#2
+                elif read.seq[element+1] == "N": 
+                    methylated = 2#3
+                else:
+                    methylated = 3
             chrom = read.reference_name
             if not faChr:
                 if len(chrom) <= 2:
@@ -224,10 +242,13 @@ def updateCpG(read, CpG, faChr, referenceCpGs, regionStart):
                 CpG.at[row,'methylated'] = methylated
                 CpG.at[row,'position'] = position-start
             else:
-                data.append({"chr":chrom,"start":read.reference_start,"stop":read.reference_end,"UUID":read.query_name,"methylated":methylated,"position":position-start})
+                data.append({"chr":chrom,"start":read.reference_start,"stop":read.reference_end,\
+                            "UUID":read.query_name,"methylated":methylated,"position":position-start})
         position += 1
     ##append data with the current methylation rate of the read
-    data.append({"chr":str(chrom)+"|read_c_count","start":read.reference_start,"stop":read.reference_end,"UUID":read.query_name,"methylated":[current_read_c,current_ref_c],"position":((current_read_c/current_ref_c)*100)})
+    data.append({"chr":str(chrom)+"|read_c_count","start":read.reference_start,\
+                "stop":read.reference_end,"UUID":read.query_name,"methylated":[current_read_c,current_ref_c],\
+                "position":((current_read_c/current_ref_c)*100)})
     out = CpG.append(data, ignore_index=True)
     return out
 
@@ -264,11 +285,13 @@ def make_meth(args):
     command = ""
 
     if ".fa" in args.r and len(args.i.split(",")) == 2 : 
-        command += "bwameth.py --reference "+args.r+" "+fq1+" "+fq2+" -t "+args.t+" | awk \'length(\$10) > "+args.f+" || \$1 ~ /^@/\' | samtools view -bS > "+outputBam+"; "
+        command += "bwameth.py --reference "+args.r+" "+fq1+" "+fq2+" -t "+args.t+" \
+                    | awk \'length(\$10) > "+args.f+" || \$1 ~ /^@/\' | samtools view -bS > "+outputBam+"; "
         command += "samtools sort "+outputBam+" -o "+outputSorted+"; "
     if args.region:        
         regionBam = outputSorted.split(".bam")[0]+args.region+".bam"
-        print "the full BAM file is located at: "+outputSorted+"\nCreating now a BAM file containing only the calls of the given region, which is located at: "+regionBam
+        print "the full BAM file is located at: "+outputSorted+"\n\
+                Creating now a BAM file containing only the calls of the given region, which is located at: "+regionBam
         command += "samtools view -b "+outputSorted+" \""+args.region+"\" > "+regionBam+"; "
         outputSorted = regionBam   
 
@@ -305,7 +328,7 @@ def get_ref_for_pos(ref, pos, inputformat):
 
 
 
-def plot(plotData, outputFile, regionStart, landscape):
+def plot(plotData, outputFile, regionStart, landscape, N_color, other_color):
 
     
     
@@ -356,9 +379,9 @@ def plot(plotData, outputFile, regionStart, landscape):
                     elif methylated == 1: ##methylated
                         circle = plt.Circle((x+offset, y-offset), offset, color='black', fill=True)
                     elif methylated == 2: ##detected an N
-                        circle = plt.Circle((x+offset, y-offset), offset, color='grey', fill=True)
-                    elif methylated == 3: ##something other than C, T or N
-                        circle = plt.Circle((x+offset, y-offset), offset, color='grey', fill=False, linestyle='--', hatch='+')
+                        circle = plt.Circle((x+offset, y-offset), offset, color=N_color, fill=True)
+                    elif methylated == 3: ##something other than CG, TG or N
+                        circle = plt.Circle((x+offset, y-offset), offset, color=other_color, fill=False, linestyle='--', hatch='+')
                 ax1.add_artist(circle)
                 if landscape:
                     y += 1
@@ -382,14 +405,31 @@ def plot(plotData, outputFile, regionStart, landscape):
 if __name__ == '__main__':
 
 
-    parser = argparse.ArgumentParser(description='Determines the Methylation of given position relative to a reference. You can start a run like: ~/newTools/methCalc.py -i ~/Seth/simplebs_480.sorted_CpG.bedGraph -r ~/Seth/L1HS.rmsk.txt -o ~/01_Team_Research_Data/Seth/simplebs_480.bedGraph')
+    parser = argparse.ArgumentParser(description='Determines the Methylation of given position relative to a \
+                                    reference. You can start a run like: \
+                                    python /DIRECTORY/methCalc.py \
+                                    -i /FILE_DIRECTORY/simplebs_480.sorted_CpG.bedGraph -r /FILE_DIRECTORY/L1HS.rmsk.txt \
+                                    -o /FILE_DIRECTORY/simplebs_480.bedGraph\
+\
+                                    If you want to start your run with FASTQ files, your arguments should be set as following:\
+                                    python /DIRECTORY/methCalc.py \
+                                    -i /FILE_DIRECTORY/simplebs_480.1.fastq,/FILE_DIRECTORY/simplebs_480.2.fastq \
+                                    -r /FILE_DIRECTORY/L1HS.rmsk.txt -o /FILE_DIRECTORY/simplebs_480.bedGraph')
     parser.add_argument('-i', required=True, help='input might be [.bam file, Bedgraph ,comma separated list of fastq, .txt file (with 0 and 1)]')
     parser.add_argument('-r', required=False, help='input referece file, depending on input file, might be bed/fasta/empty e.g. L1HS.bed')
     parser.add_argument('-o', required=False, help='output file, e.g. ./meth.xlsx (output file is in Excel format).')
-    parser.add_argument('-f', required=False, default=6000, help='for filtering the insertions. e.g. 6000 --> minimum 6kb length. ONLY APPLIES WHEN ALIGNING A NEW .BAM FILE!')
+    parser.add_argument('-f', required=False, default=6000, help='for filtering the insertions. e.g. 6000 --> \
+                        minimum 6kb length. ONLY APPLIES WHEN ALIGNING A NEW .BAM FILE!')
+    parser.add_argument('--N_color', required=False, default='green', help='select the color you want to use for \
+                        illustrating if the read has at the current position a N, default=\'green\'')
+    parser.add_argument('--other_color', required=False, default='grey', help='select the color you want to use \
+                        for illustrating if the read has at the current position something \
+                        else than CG, TG or N, default=\'grey\'')
     parser.add_argument('--bam', required=False, help='location of .bam file can be set either here or in args.i')
     parser.add_argument('--region', default="", required=False, help='should be e.g. "chr1:10000-20000"')
-    parser.add_argument('--portrait', default=False, required=False, action='store_true', help='create figure in portrait mode instead of landscape, default=False')
+    parser.add_argument('--portrait', default=False, required=False, action='store_true', help='create figure in \
+                        portrait mode instead of landscape, default=False')
+    parser.add_argument('--strict_cpg', default=False, required=False, action='store_true', help='Strict CpG site check of bisulfite sequence for repetitive sequence analysis')
 #    parser.add_argument('--lookup', required=False, help='needed if -r is a fasta file and you want to create a graph and bedgraph file. e.g. L1HS.bed')
 
     args = parser.parse_args()
