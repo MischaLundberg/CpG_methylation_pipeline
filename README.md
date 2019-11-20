@@ -48,7 +48,7 @@ usage: CpG_Meth.py [-h] -i I [-r R] [-o O] [-f F] [--N_color N_COLOR]
 
 Determines the Methylation of given position relative to a reference. 
 
-:information_source: Please remember, if you are not natively using Python 2 to load the environment (conda activate CpGmeth)
+:information_source: Please remember, if you are not natively using Python 2 to load the environment ```conda activate CpGmeth```
 
 You can start a run like: 
 ```
