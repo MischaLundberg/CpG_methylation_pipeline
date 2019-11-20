@@ -7,23 +7,28 @@ The different steps of the pipeline are
 - Analyzing the CpG methylation for each read
 - Writing data to an Excel sheet containing chromosom, start, stop, UUID, methylated (yes/no)
 
+---
 
 # Getting Started
 In order to download `TEpoly`, you should clone this repository via the commands
 ```  
 git clone https://github.com/MischaLundberg/CpG_methylation_pipeline
-cd CpG-methylation_pipeline
+cd CpG_methylation_pipeline
 ```
 
 In order to install the Python dependencies, you will need the [Anaconda](https://store.continuum.io/cshop/anaconda/) Python distribution and package manager. After installing Anaconda, run the following commands to create an environment with CpG_Meth's dependencies:
 
 ```
 conda env create --file environment.yml
-source activate cpgmeth
+conda activate CpGmeth
+
+## to deactivate the environment, type
+#conda deactivate
 ```
 
 If you receive any errors while running CpG_Meth, please ensure your versioning for the prerequisites is according to the tested versions.
 
+---
 
 # Input
 The needed input depends on the stage you want to run with the pipeline.
@@ -35,16 +40,22 @@ Full run:
 - [not implemented yet](optional) filter the length of insertions (default is 6000)
 .....
 
-usage: CpG_Meth.py [-h] -i I [-r R] [-o O] [-f F] [--N_color N_COLOR]
+```usage: CpG_Meth.py [-h] -i I [-r R] [-o O] [-f F] [--N_color N_COLOR]
                    [--other_color OTHER_COLOR] [--bam BAM] [--region REGION]
-                   [--portrait] [--strict_cpg]
+                   [--portrait] [--strict_cpg]```
 
-Determines the Methylation of given position relative to a reference. You can
-start a run like: /DIRECTORY/methCalc.py -i /FILE_DIRECTORY/simplebs_480.sorted_CpG.bedGraph -r /FILE_DIRECTORY/L1HS.rmsk.txt -o /FILE_DIRECTORY/simplebs_480.bedGraph
 
-If you want to start your run with FASTQ files, your arguments should be set as following:
-/DIRECTORY/methCalc.py -i /FILE_DIRECTORY/simplebs_480.1.fastq,/FILE_DIRECTORY/simplebs_480.2.fastq -r /FILE_DIRECTORY/L1HS.rmsk.txt -o /FILE_DIRECTORY/simplebs_480.bedGraph
+Determines the Methylation of given position relative to a reference. 
 
+| Please remember, if you are not natively using Python 2 to load the environment (conda activate CpGmeth) |
+
+You can start a run like: 
+```/DIRECTORY/methCalc.py -i /FILE_DIRECTORY/simplebs_480.sorted_CpG.bedGraph -r /FILE_DIRECTORY/L1HS.rmsk.txt -o /FILE_DIRECTORY/simplebs_480.bedGraph```
+
+If you want to start your run with *FASTQ* files, your arguments should be set as following:
+```/DIRECTORY/methCalc.py -i /FILE_DIRECTORY/simplebs_480.1.fastq,/FILE_DIRECTORY/simplebs_480.2.fastq -r /FILE_DIRECTORY/L1HS.rmsk.txt -o /FILE_DIRECTORY/simplebs_480.bedGraph```
+
+```
 optional arguments:
   -h, --help            show this help message and exit
   -i I                  input might be [.bam file, Bedgraph ,comma separated
@@ -70,7 +81,9 @@ optional arguments:
                         default=False
   --strict_cpg          Strict CpG site check of bisulfite sequence for
                         repetitive sequence analysis
+```
 
+---
 
 # Prerequisites
 If not stated otherwise Install the newest version.
@@ -88,11 +101,17 @@ Python 2.7 (if running anaconda, everything except pysam and biopython is alread
  - Pysam: 0.14.1
  - Biopython: 1.71
 
+--
+
 # Further development
 There is going to be a future update containing the options
 - to derive only sequences for a given BED file
 
+---
+
 # Contact
 For questions or errors, either create a issue/pullrequest or contact me via email (mischa(dot)lundberg(at)mater(dot)uq(dot)edu(dot)au
+
+---
 
 # Dont forget to cite
