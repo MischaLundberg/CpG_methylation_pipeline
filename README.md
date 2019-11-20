@@ -10,7 +10,7 @@ The different steps of the pipeline are
 ---
 
 # Getting Started
-In order to download `TEpoly`, you should clone this repository via the commands
+In order to download `CpG methylation pipeline`, you should clone this repository via the commands
 ```  
 git clone https://github.com/MischaLundberg/CpG_methylation_pipeline
 cd CpG_methylation_pipeline
