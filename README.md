@@ -40,23 +40,29 @@ Full run:
 - [not implemented yet](optional) filter the length of insertions (default is 6000)
 .....
 
-```usage: CpG_Meth.py [-h] -i I [-r R] [-o O] [-f F] [--N_color N_COLOR]
+```
+usage: CpG_Meth.py [-h] -i I [-r R] [-o O] [-f F] [--N_color N_COLOR]
                    [--other_color OTHER_COLOR] [--bam BAM] [--region REGION]
-                   [--portrait] [--strict_cpg]```
-
+                   [--portrait] [--strict_cpg]
+```
 
 Determines the Methylation of given position relative to a reference. 
 
 | Please remember, if you are not natively using Python 2 to load the environment (conda activate CpGmeth) |
 
 You can start a run like: 
-```/DIRECTORY/methCalc.py -i /FILE_DIRECTORY/simplebs_480.sorted_CpG.bedGraph -r /FILE_DIRECTORY/L1HS.rmsk.txt -o /FILE_DIRECTORY/simplebs_480.bedGraph```
+```
+/DIRECTORY/methCalc.py -i /FILE_DIRECTORY/simplebs_480.sorted_CpG.bedGraph -r /FILE_DIRECTORY/L1HS.rmsk.txt -o /FILE_DIRECTORY/simplebs_480.bedGraph
+```
 
 If you want to start your run with *FASTQ* files, your arguments should be set as following:
-```/DIRECTORY/methCalc.py -i /FILE_DIRECTORY/simplebs_480.1.fastq,/FILE_DIRECTORY/simplebs_480.2.fastq -r /FILE_DIRECTORY/L1HS.rmsk.txt -o /FILE_DIRECTORY/simplebs_480.bedGraph```
-
 ```
-optional arguments:
+/DIRECTORY/methCalc.py -i /FILE_DIRECTORY/simplebs_480.1.fastq,/FILE_DIRECTORY/simplebs_480.2.fastq -r /FILE_DIRECTORY/L1HS.rmsk.txt -o /FILE_DIRECTORY/simplebs_480.bedGraph
+```
+
+
+optional arguments are:
+```
   -h, --help            show this help message and exit
   -i I                  input might be [.bam file, Bedgraph ,comma separated
                         list of fastq, .txt file (with 0 and 1)]
