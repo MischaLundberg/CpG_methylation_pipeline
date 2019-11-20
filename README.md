@@ -107,7 +107,7 @@ Python 2.7 (if running anaconda, everything except pysam and biopython is alread
  - Pysam: 0.14.1
  - Biopython: 1.71
 
---
+---
 
 # Further development
 There is going to be a future update containing the options
