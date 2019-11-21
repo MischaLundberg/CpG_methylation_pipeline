@@ -59,12 +59,12 @@ Determines the Methylation of given position relative to a reference.
 
 You can start a run like: 
 ```
-/DIRECTORY/methCalc.py -i /FILE_DIRECTORY/simplebs_480.sorted_CpG.bedGraph -r /FILE_DIRECTORY/L1HS.rmsk.txt -o /FILE_DIRECTORY/simplebs_480.bedGraph
+/DIRECTORY/CpG_Meth.py -i /FILE_DIRECTORY/simplebs_480.sorted_CpG.bedGraph -r /FILE_DIRECTORY/L1HS.rmsk.txt -o /FILE_DIRECTORY/simplebs_480.bedGraph
 ```
 
 If you want to start your run with *FASTQ* files, your arguments should be set as following:
 ```
-/DIRECTORY/methCalc.py -i /FILE_DIRECTORY/simplebs_480.1.fastq,/FILE_DIRECTORY/simplebs_480.2.fastq -r /FILE_DIRECTORY/L1HS.rmsk.txt -o /FILE_DIRECTORY/simplebs_480.bedGraph
+/DIRECTORY/CpG_Meth.py -i /FILE_DIRECTORY/simplebs_480.1.fastq,/FILE_DIRECTORY/simplebs_480.2.fastq -r /FILE_DIRECTORY/L1HS.rmsk.txt -o /FILE_DIRECTORY/simplebs_480.bedGraph
 ```
 
 
