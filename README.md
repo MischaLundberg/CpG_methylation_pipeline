@@ -92,6 +92,11 @@ optional arguments are:
 ---
 
 # Prerequisites
+
+Additionally to Python (Anaconda), the following software is needed:
+- BWAMeth
+- SamTools (> 0.1.19)
+
 If not stated otherwise Install the newest version.
 Python 2.7 (if running anaconda, everything except pysam and biopython is already preinstalled)
 - Pandas (install with pip install pandas)
@@ -106,7 +111,7 @@ Python 2.7 (if running anaconda, everything except pysam and biopython is alread
  - Numpy: 1.14.3
  - Pysam: 0.14.1
  - Biopython: 1.71
-
+ - Xlsaxwriter: 1.0.2
 ---
 
 # Further development

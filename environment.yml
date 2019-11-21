@@ -8,3 +8,4 @@ dependencies:
 - pysam=0.14.1
 - matplotlib
 - biopython=1.71
+- xlsxwriter=1.0.2

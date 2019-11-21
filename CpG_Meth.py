@@ -54,7 +54,8 @@ def main(args):
 
     ## if you claim to use preexisting aligned data
     if (".bam" in args.i) or (args.bam is not None):
-        
+    
+        print "BAM input file supplied"    
         ## if you didnt supply the needed reference fasta
         if ".fasta" not in args.r and ".fa" not in args.r:
             ## TODO: add system.stderr message
@@ -87,14 +88,21 @@ def main(args):
 
     ## if you use a output file from a prevalent step
     elif ".txt" in args.i or ".csv" in args.i:
+        print "Outputfile from previous run supplied. Starting plotting."
         plot(args.i, outputFile+".svg", regionStart, not(args.portrait), args.N_color, args.other_color)
 
     ## if you want to run the full pipeline
-    elif ".fa" in args.r and "," in args.i:
+    elif (".fa" in args.r or ".txt" in args.r) and "," in args.i:
+        print "Unaligned input supplied, generating BAM using BWAMeth"
         args.bam = make_meth(args)
         sam = 1
         bwameth = 1
         CpGs = methyl(args)
+        print CpGs
+        if len(CpGs)==0:
+            print "!"*48
+            print "! no CpGs found. Please check your input files !"
+            print "!"*48
         CpG_methylation = CpGs[CpGs['chr'].str.endswith("read_c_count")]## get all lines with "read_c_count"
         for index, row in CpG_methylation.iterrows():
             CpG_methylation.loc[index, 'chr'] = str(CpG_methylation.loc[index]['chr'].split('|')[0])
@@ -118,7 +126,17 @@ def main(args):
         print "! Run it from a bed is not implemented so far. !"
         print "!"*48
         #TODO: add system.stderr message
+        exit(1)
         
+    else:
+        print "!"*37
+        print "! Could not resolve input file type !" 
+        print "!"*37
+        print ""
+        print "your input file was: %s" %(args.i)
+        print "Your Input contained several files: %s" %("," in args.i)
+        exit(1)
+
     citation = cite[0]
     if sam == 1:
         citation += cite[1]
@@ -134,8 +152,9 @@ def methyl(args):
 
     global global_ref_c
     global nr_of_reads
-    meth_dict = {'Methylation_List','Family','UUID','position'}
-    CG_dict = {'Chr','Start','Stop'}
+    #meth_dict = {'Methylation_List','Family','UUID','position'}
+    #CG_dict = {'Chr','Start','Stop'}
+    print "Loading the bam file"
     samfile = pysam.AlignmentFile(args.bam, "rb")
     ref = SeqIO.to_dict(SeqIO.parse(open(args.r), 'fasta'))
     faChrCheck =  "chr" in SeqIO.parse(open(args.r), 'fasta').next().id 
@@ -276,6 +295,14 @@ def make_meth(args):
         delim = "fq"
     else:
         delim = fq1.split(".")[-1]
+
+    if not os.path.isfile(fq1) or not os.path.isfile(fq2):
+    
+        print "!"*(37+len(args.i))
+        print "! your input files \"%s\" do not exist. !" %(args.i)
+        print "!"*(37+len(args.i))
+        exit(1) 
+
     outputSorted = fq1.split(delim)[0]+"sorted.bam"
     outputBam = fq1.split(delim)[0]+".bam"
     ##check if reference is indexed
@@ -405,16 +432,16 @@ def plot(plotData, outputFile, regionStart, landscape, N_color, other_color):
 if __name__ == '__main__':
 
 
-    parser = argparse.ArgumentParser(description='Determines the Methylation of given position relative to a \
-                                    reference. You can start a run like: \
-                                    python /DIRECTORY/methCalc.py \
+    parser = argparse.ArgumentParser(description="""Determines the Methylation of given position relative to a 
+                                    reference. You can start a run like: 
+                                    python /DIRECTORY/methCalc.py 
                                     -i /FILE_DIRECTORY/simplebs_480.sorted_CpG.bedGraph -r /FILE_DIRECTORY/L1HS.rmsk.txt \
-                                    -o /FILE_DIRECTORY/simplebs_480.bedGraph\
+                                    -o /FILE_DIRECTORY/simplebs_480.bedGraph\n\n\
 \
-                                    If you want to start your run with FASTQ files, your arguments should be set as following:\
+                                    If you want to start your run with FASTQ files, your arguments should be set as following:\n\
                                     python /DIRECTORY/methCalc.py \
                                     -i /FILE_DIRECTORY/simplebs_480.1.fastq,/FILE_DIRECTORY/simplebs_480.2.fastq \
-                                    -r /FILE_DIRECTORY/L1HS.rmsk.txt -o /FILE_DIRECTORY/simplebs_480.bedGraph')
+                                    -r /FILE_DIRECTORY/L1HS.rmsk.txt -o /FILE_DIRECTORY/simplebs_480.bedGraph""")
     parser.add_argument('-i', required=True, help='input might be [.bam file, Bedgraph ,comma separated list of fastq, .txt file (with 0 and 1)]')
     parser.add_argument('-r', required=False, help='input referece file, depending on input file, might be bed/fasta/empty e.g. L1HS.bed')
     parser.add_argument('-o', required=False, help='output file, e.g. ./meth.xlsx (output file is in Excel format).')
