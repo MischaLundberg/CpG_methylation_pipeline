@@ -26,6 +26,13 @@ conda activate CpGmeth
 #conda deactivate
 ```
 
+In case you are updating your current version of the CpG Methylation pipeline, it would be best practice to also update your environment to the updated prerequisetes.
+If you are using a Anaconda environment, you can do so by typing
+```
+conda env update --name CpGmeth --file environment.yml
+```
+
+
 If you receive any errors while running CpG_Meth, please ensure your versioning for the prerequisites is according to the tested versions.
 
 ---
