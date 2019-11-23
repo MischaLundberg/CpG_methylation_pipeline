@@ -321,7 +321,10 @@ def make_meth(args):
                 Creating now a BAM file containing only the calls of the given region, which is located at: "+regionBam
         command += "samtools view -b "+outputSorted+" \""+args.region+"\" > "+regionBam+"; "
         outputSorted = regionBam   
-
+    
+    print "Aligning fastq files"
+    subprocess.call(command, shell=True)
+    print "Alignment of fastq files finished"
     meth = os.path.basename(outputBam)
     meth += "_CpG.bedGraph"
  
