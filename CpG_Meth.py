@@ -314,7 +314,7 @@ def make_meth(args):
 
     if ".fa" in args.r and len(args.i.split(",")) == 2 : 
         command += "bwameth.py --reference "+args.r+" -t "+str(args.t)+" "+fq1+" "+fq2+" > "+outputSam
-        command += "awk \'length(\$10) "+outputSam+" > "+args.f+" | \$1 ~ /^@/\' | samtools view -bS > "+outputBam+"; "
+        command += "; awk \'length(\$10) "+outputSam+" > "+args.f+" | \$1 ~ /^@/\' | samtools view -bS > "+outputBam+"; "
         command += "samtools sort "+outputBam+" -o "+outputSorted+"; "
     if args.region:        
         regionBam = outputSorted.split(".bam")[0]+args.region+".bam"
