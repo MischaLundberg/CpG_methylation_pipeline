@@ -445,6 +445,7 @@ if __name__ == '__main__':
     parser.add_argument('-i', required=True, help='input might be [.bam file, Bedgraph ,comma separated list of fastq, .txt file (with 0 and 1)]')
     parser.add_argument('-r', required=False, help='input referece file, depending on input file, might be bed/fasta/empty e.g. L1HS.bed')
     parser.add_argument('-o', required=False, help='output file, e.g. ./meth.xlsx (output file is in Excel format).')
+    parser.add_argument('-t', required=False, default=2, help='Threads to be used for alignment step in BWAmeth. Default = 2 Threads')
     parser.add_argument('-f', required=False, default=6000, help='for filtering the insertions. e.g. 6000 --> \
                         minimum 6kb length. ONLY APPLIES WHEN ALIGNING A NEW .BAM FILE!')
     parser.add_argument('--N_color', required=False, default='green', help='select the color you want to use for \
