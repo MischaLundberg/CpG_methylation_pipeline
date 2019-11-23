@@ -305,6 +305,7 @@ def make_meth(args):
 
     outputSorted = fq1.split(delim)[0]+"sorted.bam"
     outputBam = fq1.split(delim)[0]+".bam"
+    outputSam = fq1.split(delim)[0]+".sam"
     ##check if reference is indexed
     if not os.path.isfile(args.r+".bwameth.c2t"):
         command = "bwameth.py index "+args.r
@@ -312,8 +313,8 @@ def make_meth(args):
     command = ""
 
     if ".fa" in args.r and len(args.i.split(",")) == 2 : 
-        command += "bwameth.py --reference "+args.r+" "+fq1+" "+fq2+" -t "+str(args.t)
-        command += " | awk \'length(\$10) > "+args.f+" | \$1 ~ /^@/\' | samtools view -bS > "+outputBam+"; "
+        command += "bwameth.py --reference "+args.r+" -t "+str(args.t)+" "+fq1+" "+fq2+" > "+outputSam
+        command += "awk \'length(\$10) "+outputSam+" > "+args.f+" | \$1 ~ /^@/\' | samtools view -bS > "+outputBam+"; "
         command += "samtools sort "+outputBam+" -o "+outputSorted+"; "
     if args.region:        
         regionBam = outputSorted.split(".bam")[0]+args.region+".bam"
