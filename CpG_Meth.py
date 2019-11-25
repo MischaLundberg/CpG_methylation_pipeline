@@ -332,7 +332,7 @@ def make_meth(args):
     outputSam = fq1.split(delim)[0]+".sam"
     ##check if reference is indexed
     if not os.path.isfile(args.r+".bwameth.c2t"):
-        command = "bwameth.py index "+args.r
+        command = "python bwameth.py index "+args.r
         print "*** Indexing your reference fasta %s" %args.r
         subprocess.call(command, shell=True)
     command = ""
