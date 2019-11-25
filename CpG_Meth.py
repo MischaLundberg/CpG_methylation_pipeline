@@ -98,7 +98,7 @@ def main(args):
         sam = 1
         bwameth = 1
         CpGs = methyl(args)
-        print CpGs
+        #print CpGs
         if len(CpGs)==0:
             print "!"*48
             print "! no CpGs found. Please check your input files !"
@@ -117,10 +117,11 @@ def main(args):
         writer = pd.ExcelWriter(exceloutput+"_methylation.xlsx")
         CpG_methylation.to_excel(writer,'CpG methylation')
         writer.save()
-        print CpG_methylation
+        #print CpG_methylation
         print "*** Excelsheet saved here: %s" %exceloutput+".xlsx"
         CpGs.to_csv(path_or_buf=exceloutput+"_plot.csv", sep=',', header=False,index=False)
         plot(exceloutput+"_plot.csv", outputFile+".svg", regionStart, not(args.portrait), args.N_color, args.other_color)
+        os.remove(exceloutput+"_plot.csv")
 
     elif ".bed" in args.r and ".bed" in args.i:
         print "!"*48
@@ -159,7 +160,7 @@ def methyl(args):
     samfile = pysam.AlignmentFile(args.bam, "rb")
     ref = SeqIO.to_dict(SeqIO.parse(open(args.r), 'fasta'))
     faChrCheck =  "chr" in SeqIO.parse(open(args.r), 'fasta').next().id 
-    header = ["chr","start","stop","UUID","methylated","position"]
+    header = ["chr","start","stop","UUID","methylated CpGs","position"]
     CpG = pd.DataFrame(columns=header)
     if ":" in args.region and "-" in args.region:
         chrom = args.region.split(":")[0]
@@ -216,8 +217,8 @@ def initializeCpG(CpG, referenceSeq, chrom, start, end):
     for element in range(len(referenceSeq)-1):
         if referenceSeq[element] == "C" and referenceSeq[element+1] == "G":
             CpGs.append({"chr":chrom,"start":start+element,"stop":start+element+1,"UUID":np.nan,\
-                        "methylated":-1,"position":start+element})
-    print "CpGs: %s" %CpGs
+                        "methylated CpGs":-1,"position":start+element})
+    #print "CpGs: %s" %CpGs
     return CpGs
 
 ##  Updates the given CpG DataFrame for each CG position
@@ -235,7 +236,7 @@ def updateCpG(read, CpG, faChr, referenceCpGs, regionStart, strict_cpg):
     position = read.reference_start - regionStart
     chrom = read.reference_name
 
-    print "referenceCpGs: %s" %referenceCpGs
+    #print "referenceCpGs: %s" %referenceCpGs
     for entry in referenceCpGs:#element in range(len(read.seq)-1):
         #### each entry represents one C within the reference
         element = int(entry.get("position"))-regionStart
@@ -274,22 +275,22 @@ def updateCpG(read, CpG, faChr, referenceCpGs, regionStart, strict_cpg):
                 else:
                     methylated = 3
             chrom = read.reference_name
-            print "chrom: "+chrom
+            #print "chrom: "+chrom
             if not faChr:
                 if len(chrom) <= 2:
                     chrom = "chr"+read.reference_name
             if CpG['UUID'][CpG['chr'] == chrom][CpG['start'] == read.pos].values == []:
                 row = CpG.iloc[['chr' == read.reference_name]['start' == read.pos]]
                 CpG.at[row,'UUID'] = read.query_name
-                CpG.at[row,'methylated'] = methylated
+                CpG.at[row,'methylated CpGs'] = methylated
                 CpG.at[row,'position'] = position-start
             else:
                 data.append({"chr":chrom,"start":read.reference_start,"stop":read.reference_end,\
-                            "UUID":read.query_name,"methylated":methylated,"position":position-start})
+                            "UUID":read.query_name,"methylated CpGs":methylated,"position":position-start})
         position += 1
     ##append data with the current methylation rate of the read
     data.append({"chr":str(chrom)+"|read_c_count","start":read.reference_start,\
-                "stop":read.reference_end,"UUID":read.query_name,"methylated":[current_read_c,current_ref_c],\
+                "stop":read.reference_end,"UUID":read.query_name,"methylated CpGs":[current_read_c,current_ref_c],\
                 "position":((current_read_c/current_ref_c)*100)})
     out = CpG.append(data, ignore_index=True)
     return out
