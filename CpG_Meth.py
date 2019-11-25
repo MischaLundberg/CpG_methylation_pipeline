@@ -117,9 +117,10 @@ def main(args):
         writer = pd.ExcelWriter(exceloutput+"_methylation.xlsx")
         CpG_methylation.to_excel(writer,'CpG methylation')
         writer.save()
+        print CpG_methylation
         print "*** Excelsheet saved here: %s" %exceloutput+".xlsx"
-        CpGs.to_csv(file_name=csvoutput, sep=',',header=False,index=False)
-        plot(csvoutput, outputFile+".svg", regionStart, not(args.portrait), args.N_color, args.other_color)
+        CpGs.to_csv(path_or_buf=exceloutput+"_plot.csv", sep=',', header=False,index=False)
+        plot(exceloutput+"_plot.csv", outputFile+".svg", regionStart, not(args.portrait), args.N_color, args.other_color)
 
     elif ".bed" in args.r and ".bed" in args.i:
         print "!"*48
@@ -166,12 +167,29 @@ def methyl(args):
         end = int(args.region.split("-")[1])
         if not faChrCheck:
             chrom = args.region.split(":")[0][3:]
+        
     else:
         #TODO: add system.stderr message
-        print "the region is not given in the needed way chr:start-stop"
-
+        print "Either no region given or the region is not given in the needed way chr:start-stop. If it was not your intention, please refer to the argument --region"
+        print "We will infer that your reference only contains one element, i.e. an L1 element you want to align agains"
+        ## infering chrom and start stop. There should be only one element in the input fasta
+        chrom = ref.keys()[0]
+        start = 0
+        end = len(ref.get(ref.keys()[0]))
+        #print "chrom: %s" %chrom
+        #print "!"*20
+        #print "sequence: %s " %ref.get(chrom)[start:end].seq
+        #print "!"*20
+        
     ## fill the dataframe with all CpGs from the reference to then check the methylation status of each read for each CpG
-    referenceCpGs = initializeCpG(CpG,ref.get(chrom)[start:end],chrom,start,end)
+    referenceCpGs = initializeCpG(CpG,ref.get(chrom)[start:end].seq.upper(),chrom,start,end)
+
+    ## checking if bam file is indexed by samtools
+    if not samfile.check_index():
+        print "Input bam file needs to be indexed!"
+        print "Please index the bam file using the following command: samtools index "+args.bam
+        exit(1)
+
 
     global_ref_c = len(referenceCpGs)
     if args.region == "":
@@ -194,11 +212,12 @@ def initializeCpG(CpG, referenceSeq, chrom, start, end):
 
 
     CpGs = []
+    #print "referenceSeq: %s" %referenceSeq
     for element in range(len(referenceSeq)-1):
         if referenceSeq[element] == "C" and referenceSeq[element+1] == "G":
             CpGs.append({"chr":chrom,"start":start+element,"stop":start+element+1,"UUID":np.nan,\
                         "methylated":-1,"position":start+element})
-    
+    print "CpGs: %s" %CpGs
     return CpGs
 
 ##  Updates the given CpG DataFrame for each CG position
@@ -214,6 +233,9 @@ def updateCpG(read, CpG, faChr, referenceCpGs, regionStart, strict_cpg):
 
     ### iterate over all Cs in the referenceCpGs
     position = read.reference_start - regionStart
+    chrom = read.reference_name
+
+    print "referenceCpGs: %s" %referenceCpGs
     for entry in referenceCpGs:#element in range(len(read.seq)-1):
         #### each entry represents one C within the reference
         element = int(entry.get("position"))-regionStart
@@ -252,6 +274,7 @@ def updateCpG(read, CpG, faChr, referenceCpGs, regionStart, strict_cpg):
                 else:
                     methylated = 3
             chrom = read.reference_name
+            print "chrom: "+chrom
             if not faChr:
                 if len(chrom) <= 2:
                     chrom = "chr"+read.reference_name
@@ -309,21 +332,24 @@ def make_meth(args):
     ##check if reference is indexed
     if not os.path.isfile(args.r+".bwameth.c2t"):
         command = "bwameth.py index "+args.r
-    print "*** Indexing your reference fasta %s" %args.r
+        print "*** Indexing your reference fasta %s" %args.r
+        subprocess.call(command, shell=True)
     command = ""
 
     if ".fa" in args.r and len(args.i.split(",")) == 2 : 
-        command += "bwameth.py --reference "+args.r+" -t "+str(args.t)+" "+fq1+" "+fq2+" > "+outputSam
-        command += "; awk \'length(\$10) "+outputSam+" > "+args.f+" | \$1 ~ /^@/\' | samtools view -bS > "+outputBam+"; "
-        command += "samtools sort "+outputBam+" -o "+outputSorted+"; "
+        command += "python bwameth.py --reference "+args.r+" -t "+str(args.t)+" "+fq1+" "+fq2+" > "+outputSam
+        command += "; awk 'length($10)>"+args.f+" || $1 ~ /^@/ {print $0}' "+outputSam+"| samtools view -bS > "+outputBam+"; "
+        #command += "; awk \'length($10) "+outputSam+" > "+args.f+" | $1 ~ /^@/\' | samtools view -bS > "+outputBam+"; "
+        command += "samtools sort "+outputBam+" -o "+outputSorted+"; samtools index "+outputSorted+";"
     if args.region:        
         regionBam = outputSorted.split(".bam")[0]+args.region+".bam"
         print "the full BAM file is located at: "+outputSorted+"\n\
                 Creating now a BAM file containing only the calls of the given region, which is located at: "+regionBam
-        command += "samtools view -b "+outputSorted+" \""+args.region+"\" > "+regionBam+"; "
+        command += "samtools view -b "+outputSorted+" \""+args.region+"\" > "+regionBam+"; samtools index "+regionBam+"; "
         outputSorted = regionBam   
     
     print "Aligning fastq files"
+    print "using the follwoing command for alignment: %s" %(command)
     subprocess.call(command, shell=True)
     print "Alignment of fastq files finished"
     meth = os.path.basename(outputBam)
@@ -370,7 +396,7 @@ def plot(plotData, outputFile, regionStart, landscape, N_color, other_color):
     if len(df.index) > 0:
 
         if landscape:
-            f, ax1 = plt.subplots(figsize=(len(start_grouped),len(read_grouped)))
+            f, ax1 = plt.subplots(figsize=(len(start_grouped),len(read_grouped)+0.75))
         else:
             f, ax1 = plt.subplots(figsize=(len(read_grouped),len(start_grouped)))
         bar_width = 0.75
@@ -381,8 +407,12 @@ def plot(plotData, outputFile, regionStart, landscape, N_color, other_color):
         else:
             ax1.set_xlim((0,len(read_grouped)-1))
             ax1.set_ylim((0,len(start_grouped)))
+        
+        ax1.set_title('CpG methylation')
+        ax1.set_xlabel('Bases')
         plt.xticks([])
         plt.yticks([])
+        plt.tight_layout()
         offset = 0.492
         emptyCircle = []
         circles = []
@@ -407,13 +437,18 @@ def plot(plotData, outputFile, regionStart, landscape, N_color, other_color):
                     methylated = int(group.loc[ind]['methylated'])
                     if methylated == 0: ##not methylated
                         circle = plt.Circle((x+offset, y-offset), offset, color='black', fill=False)
+                        label = 'not methylated'
                     elif methylated == 1: ##methylated
                         circle = plt.Circle((x+offset, y-offset), offset, color='black', fill=True)
+                        label = 'methylated'
                     elif methylated == 2: ##detected an N
                         circle = plt.Circle((x+offset, y-offset), offset, color=N_color, fill=True)
+                        label = 'N'
                     elif methylated == 3: ##something other than CG, TG or N
                         circle = plt.Circle((x+offset, y-offset), offset, color=other_color, fill=False, linestyle='--', hatch='+')
+                        label = 'other than CG, TG or N'
                 ax1.add_artist(circle)
+                ax1.legend([circle], [label],loc='upper right', bbox_to_anchor=(0.7, 1.35), ncol=4)
                 if landscape:
                     y += 1
                 else:
@@ -422,6 +457,7 @@ def plot(plotData, outputFile, regionStart, landscape, N_color, other_color):
                 x += 1
             else:
                 y -= 1
+        #ax1.legend(loc='upper right', bbox_to_anchor=(0.75, 1.35), ncol=4, fancybox=True, shadow=True)
         plt.savefig(outputFile, dpi=300)
         print "Output is saved under: %s" %outputFile
         
@@ -448,7 +484,7 @@ if __name__ == '__main__':
                                     -r /FILE_DIRECTORY/L1HS.rmsk.txt -o /FILE_DIRECTORY/simplebs_480.bedGraph""")
     parser.add_argument('-i', required=True, help='input might be [.bam file, Bedgraph ,comma separated list of fastq, .txt file (with 0 and 1)]')
     parser.add_argument('-r', required=False, help='input referece file, depending on input file, might be bed/fasta/empty e.g. L1HS.bed')
-    parser.add_argument('-o', required=False, help='output file, e.g. ./meth.xlsx (output file is in Excel format).')
+    parser.add_argument('-o', required=False, help='output file, e.g. ./meth to get the file ./meth.xlsx (output file is in Excel format).')
     parser.add_argument('-t', required=False, default=2, help='Threads to be used for alignment step in BWAmeth. Default = 2 Threads')
     parser.add_argument('-f', required=False, default=6000, help='for filtering the insertions. e.g. 6000 --> \
                         minimum 6kb length. ONLY APPLIES WHEN ALIGNING A NEW .BAM FILE!')

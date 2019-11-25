@@ -101,7 +101,7 @@ optional arguments are:
 # Prerequisites
 
 Additionally to Python (Anaconda), the following software is needed:
-- BWAMeth
+- BWAMeth can be downloaded [here](https://github.com/brentp/bwa-meth). Nevertheless, a tested version is delivered with this git repository
 - SamTools (> 0.1.19)
 
 If not stated otherwise Install the newest version.

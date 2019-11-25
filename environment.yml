@@ -9,3 +9,8 @@ dependencies:
 - matplotlib
 - biopython=1.71
 - xlsxwriter=1.0.2
+#- __future__
+#- tempfile
+#- operator
+#- itertools
+- toolshed>=0.3.9
