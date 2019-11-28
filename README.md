@@ -100,25 +100,30 @@ optional arguments are:
 
 # Prerequisites
 
-Additionally to Python (Anaconda), the following software is needed:
+Additionally to Python (Anaconda2 or Anaconda3 [if environment is used, as the script is written in python 2!]), the following software is needed:
 - BWAMeth can be downloaded [here](https://github.com/brentp/bwa-meth). Nevertheless, a tested version is delivered with this git repository
-- SamTools (> 0.1.19)
+- BWA MEM is needed by BWAMeth and can be downloaded [here](http://bio-bwa.sourceforge.net/)
+~~- SamTools (> 0.1.19) can be downloaded [here](https://github.com/samtools/samtools/releases/download/1.9/samtools-1.9.tar.bz2)~~
 
 If not stated otherwise Install the newest version.
-Python 2.7 (if running anaconda, everything except pysam and biopython is already preinstalled)
+Python 2.7 (if running anaconda, everything except pysam, Matplotlib, XLSXwirter and Toolshed is already preinstalled)
 - Pandas (install with pip install pandas)
-- Numpy (install with pip install pnumpy)
+- Numpy (install with pip install numpy)
 - Matplotlib (install with pip install matplotlib)
 - Pysam (install with pip install pysam)
 - Biopython (install with pip instal biopython)
+- XLSXwritert (install with pip install xlsxwriter)
+- Toolshed (install with pip install toolshed)
 
 - Script was tested with the following versions installed:
- - Anaconda2
+ - Anaconda2 
  - Pandas: 0.22.0
  - Numpy: 1.14.3
  - Pysam: 0.14.1
  - Biopython: 1.71
- - Xlsaxwriter: 1.0.2
+ - Xlsxwriter: 1.0.2
+ - toolshed: 0.3.9
+
 ---
 
 # Further development

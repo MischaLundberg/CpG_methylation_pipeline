@@ -11,6 +11,7 @@
 import argparse
 import subprocess
 import os
+import re
 import pandas as pd
 import numpy as np
 import matplotlib
@@ -204,6 +205,7 @@ def methyl(args):
             CpG = updateCpG(read, CpG, faChrCheck, referenceCpGs, start, args.strict_cpg)
 
     CpG = equalizeCpG(CpG)
+    samfile.close()
     return CpG.dropna(thresh=4)
 
 ##  Initializes the CpG Dict with all positions of a CG
@@ -327,9 +329,19 @@ def make_meth(args):
         print "!"*(37+len(args.i))
         exit(1) 
 
-    outputSorted = fq1.split(delim)[0]+"sorted.bam"
-    outputBam = fq1.split(delim)[0]+".bam"
-    outputSam = fq1.split(delim)[0]+".sam"
+    dot = '.'
+    if str(fq1.split(delim)[0])[-1] == ".":
+        dot = ''
+    fn = str(fq1.split(delim)[0])+dot
+    if "R1_" in str(fq1.split(delim)[0]):
+        fn = re.sub('R1_', '', fn)
+    if "_R1" in str(fq1.split(delim)[0]):
+        fn = re.sub('_R1', '', fn)
+
+    outputSorted = fn+"sorted.bam"
+    outputBam = fn+"bam"
+    outputSam = fn+"sam"
+    tempOutputSam = fn+"temp.sam"
     ##check if reference is indexed
     if not os.path.isfile(args.r+".bwameth.c2t"):
         command = "python bwameth.py index "+args.r
@@ -339,20 +351,38 @@ def make_meth(args):
 
     if ".fa" in args.r and len(args.i.split(",")) == 2 : 
         command += "python bwameth.py --reference "+args.r+" -t "+str(args.t)+" "+fq1+" "+fq2+" > "+outputSam
-        command += "; awk 'length($10)>"+args.f+" || $1 ~ /^@/ {print $0}' "+outputSam+"| samtools view -bS > "+outputBam+"; "
-        #command += "; awk \'length($10) "+outputSam+" > "+args.f+" | $1 ~ /^@/\' | samtools view -bS > "+outputBam+"; "
-        command += "samtools sort "+outputBam+" -o "+outputSorted+"; samtools index "+outputSorted+";"
+        command += "; awk 'length($10)>"+args.f+" || $1 ~ /^@/ {print $0}' "+outputSam+" > "+tempOutputSam#+"| samtools view -bS > "+outputBam+"; "
+        #command += "samtools sort "+outputBam+" -o "+outputSorted+"; samtools index "+outputSorted+";"
+
+    print "Aligning fastq files"
+    print "using the follwoing command for alignment: %s" %(command)
+    subprocess.call(command, shell=True)
+    #samfile = pysam.AlignmentFile(, "rb")
+    pysam.view("-bS", "-o", outputBam, tempOutputSam, catch_stdout=False)
+    os.remove(tempOutputSam)
+    pysam.sort("-o", outputSorted, outputBam)
+    pysam.index(outputSorted)
+    if not os.path.isfile(outputSorted + ".bai"):
+        raise RuntimeError("samtools index failed, likely bam did not get created correctly") 
+    print "Alignment of fastq files finished"
+
+
     if args.region:        
         regionBam = outputSorted.split(".bam")[0]+args.region+".bam"
         print "the full BAM file is located at: "+outputSorted+"\n\
                 Creating now a BAM file containing only the calls of the given region, which is located at: "+regionBam
-        command += "samtools view -b "+outputSorted+" \""+args.region+"\" > "+regionBam+"; samtools index "+regionBam+"; "
+        alignmentfile = pysam.AlignmentFile(outputSorted, "rb" )
+        readmappings = alignmentfile.fetch(args.region.split(':')[0], args.region.split(':')[1].split('-')[0], args.region.split('-')[1])
+        pysam.Samfile(regionBam, 'wb', template=readmappings)
+        pysam.index(regionBam)
+        alignmentfile.close()
+        readmappings.close()
+        if not os.path.isfile(regionBam + ".bai"):
+            raise RuntimeError("samtools index failed, likely bam did not get created correctly") 
+        #command += "samtools view -b "+outputSorted+" \""+args.region+"\" > "+regionBam+"; samtools index "+regionBam+"; "
         outputSorted = regionBam   
     
-    print "Aligning fastq files"
-    print "using the follwoing command for alignment: %s" %(command)
-    subprocess.call(command, shell=True)
-    print "Alignment of fastq files finished"
+    
     meth = os.path.basename(outputBam)
     meth += "_CpG.bedGraph"
  
