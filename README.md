@@ -103,8 +103,7 @@ optional arguments are:
 Additionally to Python (Anaconda2 or Anaconda3 [if environment is used, as the script is written in python 2!]), the following software is needed:
 - BWAMeth can be downloaded [here](https://github.com/brentp/bwa-meth). Nevertheless, a tested version is delivered with this git repository
 - BWA MEM is needed by BWAMeth and can be downloaded [here](http://bio-bwa.sourceforge.net/)
-
-~~- SamTools (> 0.1.19) can be downloaded [here](https://github.com/samtools/samtools/releases/download/1.9/samtools-1.9.tar.bz2)~~
+- ~~SamTools (> 0.1.19) can be downloaded [here](https://github.com/samtools/samtools/releases/download/1.9/samtools-1.9.tar.bz2)~~
 
 If not stated otherwise Install the newest version.
 Python 2.7 (if running anaconda, everything except pysam, Matplotlib, XLSXwirter and Toolshed is already preinstalled)
