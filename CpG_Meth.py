@@ -37,6 +37,13 @@ def main(args):
     global_ref_c = 0
     nr_of_reads = 0.0
     
+    if args.bwa!= "":
+        try:
+            setenv PATH "$PATH:"+args.bwa
+            PATH="$PATH:"+args.bwa
+        except:
+            print("adding BWA to your Environment didn't work")
+    
     outputFile = args.o
     if outputFile == None:
         outputFile = os.path.splitext(args.i)[0]
@@ -525,6 +532,7 @@ if __name__ == '__main__':
                         for illustrating if the read has at the current position something \
                         else than CG, TG or N, default=\'grey\'')
     parser.add_argument('--bam', required=False, help='location of .bam file can be set either here or in args.i')
+    parser.add_argument('--bwa', required=False, default="", help='If your PATH doesn\'t contain BWA (which is needed for BWAMeth), please use this option and type the path like \"/PATH/TO/BWA\". Please ensure, that it also contains the binary file --> bwa')
     parser.add_argument('--region', default="", required=False, help='should be e.g. "chr1:10000-20000"')
     parser.add_argument('--portrait', default=False, required=False, action='store_true', help='create figure in \
                         portrait mode instead of landscape, default=False')
