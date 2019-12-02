@@ -37,10 +37,11 @@ def main(args):
     global_ref_c = 0
     nr_of_reads = 0.0
     
-    if args.bwa!= "":
+    if args.bwa != '':
         try:
-            setenv PATH "$PATH:"+args.bwa
-            PATH="$PATH:"+args.bwa
+            command ="setenv PATH \"$PATH:%s\"" %args.bwa
+            command += "PATH=\"$PATH:%s\"" %args.bwa
+            subprocess.call(command, shell=True)
         except:
             print("adding BWA to your Environment didn't work")
     
@@ -185,6 +186,7 @@ def methyl(args):
         chrom = ref.keys()[0]
         start = 0
         end = len(ref.get(ref.keys()[0]))
+        print "using infered region (whole reference sequence): %s:%s-%s" %(chrom, start, end)
         #print "chrom: %s" %chrom
         #print "!"*20
         #print "sequence: %s " %ref.get(chrom)[start:end].seq
@@ -196,8 +198,8 @@ def methyl(args):
     ## checking if bam file is indexed by samtools
     if not samfile.check_index():
         print "Input bam file needs to be indexed!"
-        print "Please index the bam file using the following command: samtools index "+args.bam
-        exit(1)
+        pysam.index(args.bam)
+        print "Your input bam got indexed."
 
 
     global_ref_c = len(referenceCpGs)
@@ -351,7 +353,7 @@ def make_meth(args):
     tempOutputSam = fn+"temp.sam"
     ##check if reference is indexed
     if not os.path.isfile(args.r+".bwameth.c2t"):
-        command = "python bwameth.py index "+args.r
+        command = "python bwameth.py index "+args.r+";"
         print "*** Indexing your reference fasta %s" %args.r
         subprocess.call(command, shell=True)
     command = ""
@@ -370,7 +372,7 @@ def make_meth(args):
     pysam.sort("-o", outputSorted, outputBam)
     pysam.index(outputSorted)
     if not os.path.isfile(outputSorted + ".bai"):
-        raise RuntimeError("samtools index failed, likely bam did not get created correctly") 
+        raise RuntimeError("samtools index failed, likely the bam did not get created correctly") 
     print "Alignment of fastq files finished"
 
 
@@ -386,6 +388,7 @@ def make_meth(args):
         readmappings.close()
         if not os.path.isfile(regionBam + ".bai"):
             raise RuntimeError("samtools index failed, likely bam did not get created correctly") 
+            exit(1)
         #command += "samtools view -b "+outputSorted+" \""+args.region+"\" > "+regionBam+"; samtools index "+regionBam+"; "
         outputSorted = regionBam   
     
