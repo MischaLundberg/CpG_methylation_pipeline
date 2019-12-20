@@ -37,14 +37,6 @@ def main(args):
     global_ref_c = 0
     nr_of_reads = 0.0
     
-    if args.bwa != '':
-        try:
-            command ="setenv PATH \"$PATH:%s\"" %args.bwa
-            command += "PATH=\"$PATH:%s\"" %args.bwa
-            subprocess.call(command, shell=True)
-        except:
-            print("adding BWA to your Environment didn't work")
-    
     outputFile = args.o
     if outputFile == None:
         outputFile = os.path.splitext(args.i)[0]
@@ -167,6 +159,7 @@ def methyl(args):
     #CG_dict = {'Chr','Start','Stop'}
     print "Loading the bam file"
     samfile = pysam.AlignmentFile(args.bam, "rb")
+    
     ref = SeqIO.to_dict(SeqIO.parse(open(args.r), 'fasta'))
     faChrCheck =  "chr" in SeqIO.parse(open(args.r), 'fasta').next().id 
     header = ["chr","start","stop","UUID","methylated CpGs","position"]
@@ -186,7 +179,6 @@ def methyl(args):
         chrom = ref.keys()[0]
         start = 0
         end = len(ref.get(ref.keys()[0]))
-        print "using infered region (whole reference sequence): %s:%s-%s" %(chrom, start, end)
         #print "chrom: %s" %chrom
         #print "!"*20
         #print "sequence: %s " %ref.get(chrom)[start:end].seq
@@ -198,18 +190,21 @@ def methyl(args):
     ## checking if bam file is indexed by samtools
     if not samfile.check_index():
         print "Input bam file needs to be indexed!"
-        pysam.index(args.bam)
-        print "Your input bam got indexed."
+        print "Please index the bam file using the following command: samtools index "+args.bam
+        exit(1)
 
 
     global_ref_c = len(referenceCpGs)
     if args.region == "":
         for read in samfile.fetch():
+            #print read
             nr_of_reads += 1
             CpG = updateCpG(read, CpG, faChrCheck, referenceCpGs, start, args.strict_cpg)
+            
 
     else:
         for read in samfile.fetch(args.region.split(":")[0],int(args.region.split(":")[1].split("-")[0]),int(args.region.split("-")[1])):
+            #print read
             nr_of_reads += 1
             CpG = updateCpG(read, CpG, faChrCheck, referenceCpGs, start, args.strict_cpg)
 
@@ -224,12 +219,12 @@ def initializeCpG(CpG, referenceSeq, chrom, start, end):
 
 
     CpGs = []
-    #print "referenceSeq: %s" %referenceSeq
+    print "referenceSeq: %s" %referenceSeq
     for element in range(len(referenceSeq)-1):
         if referenceSeq[element] == "C" and referenceSeq[element+1] == "G":
             CpGs.append({"chr":chrom,"start":start+element,"stop":start+element+1,"UUID":np.nan,\
                         "methylated CpGs":-1,"position":start+element})
-    #print "CpGs: %s" %CpGs
+    print "CpGs: %s" %CpGs
     return CpGs
 
 ##  Updates the given CpG DataFrame for each CG position
@@ -244,15 +239,19 @@ def updateCpG(read, CpG, faChr, referenceCpGs, regionStart, strict_cpg):
     global global_read_c
 
     ### iterate over all Cs in the referenceCpGs
+    #print read
+    #print read.reference_start
+    #print regionStart
     position = read.reference_start - regionStart
     chrom = read.reference_name
 
     #print "referenceCpGs: %s" %referenceCpGs
     for entry in referenceCpGs:#element in range(len(read.seq)-1):
         #### each entry represents one C within the reference
+        #print entry
         element = int(entry.get("position"))-regionStart
         methylated = -1
-        if (entry.get("position")>=read.reference_start) and (entry.get("position")<=read.reference_end):
+        if (entry.get("position")>=read.reference_start) and (entry.get("position")<=read.reference_end) and (element < len(read.seq)):
             current_ref_c += 1
             if start == -1:
                 start = position
@@ -300,9 +299,11 @@ def updateCpG(read, CpG, faChr, referenceCpGs, regionStart, strict_cpg):
                             "UUID":read.query_name,"methylated CpGs":methylated,"position":position-start})
         position += 1
     ##append data with the current methylation rate of the read
-    data.append({"chr":str(chrom)+"|read_c_count","start":read.reference_start,\
-                "stop":read.reference_end,"UUID":read.query_name,"methylated CpGs":[current_read_c,current_ref_c],\
-                "position":((current_read_c/current_ref_c)*100)})
+    if (current_read_c == 0.0) or (current_ref_c == 0.0):
+        meth_pos = 0.0
+    else: meth_pos = ((current_read_c/current_ref_c)*100)
+    data.append({"chr":str(chrom)+"|read_c_count","start":read.reference_start,"stop":read.reference_end,"UUID":read.query_name,"methylated CpGs":[current_read_c,current_ref_c],"position":meth_pos})
+    #print data
     out = CpG.append(data, ignore_index=True)
     return out
 
@@ -353,7 +354,7 @@ def make_meth(args):
     tempOutputSam = fn+"temp.sam"
     ##check if reference is indexed
     if not os.path.isfile(args.r+".bwameth.c2t"):
-        command = "python bwameth.py index "+args.r+";"
+        command = "python bwameth.py index "+args.r
         print "*** Indexing your reference fasta %s" %args.r
         subprocess.call(command, shell=True)
     command = ""
@@ -361,18 +362,18 @@ def make_meth(args):
     if ".fa" in args.r and len(args.i.split(",")) == 2 : 
         command += "python bwameth.py --reference "+args.r+" -t "+str(args.t)+" "+fq1+" "+fq2+" > "+outputSam
         command += "; awk 'length($10)>"+args.f+" || $1 ~ /^@/ {print $0}' "+outputSam+" > "+tempOutputSam#+"| samtools view -bS > "+outputBam+"; "
-        #command += "samtools sort "+outputBam+" -o "+outputSorted+"; samtools index "+outputSorted+";"
+        command += "samtools sort "+outputBam+" -o "+outputSorted+"; samtools index "+outputSorted+";"
 
     print "Aligning fastq files"
     print "using the follwoing command for alignment: %s" %(command)
     subprocess.call(command, shell=True)
     #samfile = pysam.AlignmentFile(, "rb")
-    pysam.view("-bS", "-o", outputBam, tempOutputSam, catch_stdout=False)
-    os.remove(tempOutputSam)
-    pysam.sort("-o", outputSorted, outputBam)
-    pysam.index(outputSorted)
+    #pysam.view("-bS", "-o", outputBam, tempOutputSam, catch_stdout=False)
+    #os.remove(tempOutputSam)
+    #pysam.sort("-o", outputSorted, outputBam)
+    #pysam.index(outputSorted)
     if not os.path.isfile(outputSorted + ".bai"):
-        raise RuntimeError("samtools index failed, likely the bam did not get created correctly") 
+        raise RuntimeError("samtools index failed, likely bam did not get created correctly") 
     print "Alignment of fastq files finished"
 
 
@@ -388,7 +389,6 @@ def make_meth(args):
         readmappings.close()
         if not os.path.isfile(regionBam + ".bai"):
             raise RuntimeError("samtools index failed, likely bam did not get created correctly") 
-            exit(1)
         #command += "samtools view -b "+outputSorted+" \""+args.region+"\" > "+regionBam+"; samtools index "+regionBam+"; "
         outputSorted = regionBam   
     
@@ -535,7 +535,6 @@ if __name__ == '__main__':
                         for illustrating if the read has at the current position something \
                         else than CG, TG or N, default=\'grey\'')
     parser.add_argument('--bam', required=False, help='location of .bam file can be set either here or in args.i')
-    parser.add_argument('--bwa', required=False, default="", help='If your PATH doesn\'t contain BWA (which is needed for BWAMeth), please use this option and type the path like \"/PATH/TO/BWA\". Please ensure, that it also contains the binary file --> bwa')
     parser.add_argument('--region', default="", required=False, help='should be e.g. "chr1:10000-20000"')
     parser.add_argument('--portrait', default=False, required=False, action='store_true', help='create figure in \
                         portrait mode instead of landscape, default=False')
