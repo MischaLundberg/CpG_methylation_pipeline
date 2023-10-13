@@ -1,6 +1,6 @@
 # CpG_methylation_pipeline
 
-[![DOI](https://zenodo.org/badge/143381913.svg)](https://zenodo.org/badge/latestdoi/143381913)
+[![DOI](https://zenodo.org/badge/143381913.svg)](https://zenodo.org/doi/10.5281/zenodo.7428691)
 
 The pipeline can be started at different points to allow to use a beforehand created Dataset for the further evaluation.
 The different steps of the pipeline are
